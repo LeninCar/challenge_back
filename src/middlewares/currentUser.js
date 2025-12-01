@@ -1,24 +1,34 @@
-import { pool } from "../db.js";
+// src/middlewares/currentUser.js
+import jwt from "jsonwebtoken";
+// import { getUserById } from "../models/userModel.js"; // si quieres recargar desde DB
 
-export async function currentUser(req, res, next) {
-  try {
-    const userId = req.header("x-user-id");
+export function currentUser(req, res, next) {
+  const authHeader = req.headers["authorization"];
 
-    if (!userId) {
-      req.user = null;
-      return next();
-    }
-
-    const result = await pool.query(
-      "SELECT id, name, role, email FROM users WHERE id = $1",
-      [userId]
-    );
-
-    req.user = result.rows[0] || null;
-    return next();
-  } catch (err) {
-    console.error("Error en currentUser:", err);
+  if (!authHeader) {
     req.user = null;
     return next();
   }
+
+  const [type, token] = authHeader.split(" ");
+
+  if (type !== "Bearer" || !token) {
+    req.user = null;
+    return next();
+  }
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    // Opcional: recargar desde la DB
+    req.user = {
+      id: payload.userId,
+      email: payload.email,
+      role: payload.role,
+    };
+  } catch (err) {
+    console.error("Token JWT inválido:", err.message);
+    req.user = null;
+  }
+
+  next();
 }

@@ -8,7 +8,8 @@ import { router as usersRouter } from "./routes/usersRoutes.js";
 import { router as requestsRouter } from "./routes/requestsRoutes.js";
 import notificationsRoutes from "./routes/notificationsRoutes.js";
 
-import { sendMail } from "./utils/mailer.js";
+import { router as requestTypesRoutes } from "./routes/requestTypesRoutes.js";
+
 
 dotenv.config();
 
@@ -37,28 +38,7 @@ app.get("/api/me", (req, res) => {
 
 app.use("/api/notifications", notificationsRoutes);
 
-app.get("/api/test-email", async (req, res) => {
-  try {
-    const to = GMAIL_USER || "lenincarabali@gmail.com";
-
-    await sendMail({
-      to,
-      subject: "Test desde Sistema de Aprobaciones (Gmail API)",
-      text: "Hola, este es un correo de prueba enviado usando la Gmail API.",
-    });
-
-    return res.json({
-      ok: true,
-      message: `Correo de prueba enviado a ${to}`,
-    });
-  } catch (err) {
-    console.error("Error en /api/test-email:", err.response?.data || err);
-    return res.status(500).json({
-      error: "Error enviando correo de prueba",
-      details: err.message,
-    });
-  }
-});
+app.use("/api/request-types", requestTypesRoutes);
 
 
 const PORT = process.env.PORT || 4000;

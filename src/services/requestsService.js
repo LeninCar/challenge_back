@@ -2,26 +2,73 @@ import {
   createRequest,
   getPendingRequestsByApprover,
   getRequestById,
-  updateRequestStatus,
   getRequestsByApprover
 } from "../models/requestModel.js";
+
+import { pool } from "../db.js";
+
+import { sendRequestStatusChangedEmail } from "../utils/mailer.js";
+import { sendRequestCreatedEmail } from "../utils/mailer.js";
 
 import {
   createHistoryEntry,
   getHistoryByRequestId
 } from "../models/requestHistoryModel.js";
+import { createNotification } from "../models/notificationsModel.js";
 
-export async function createNewRequest(data) {
-  const request = await createRequest(data);
+async function getUserById(id) {
+  const res = await pool.query(
+    "SELECT id, name, email FROM users WHERE id = $1",
+    [id]
+  );
+  return res.rows[0] || null;
+}
 
-  // Registrar en historial la creación
+
+export async function createNewRequest({
+  title,
+  description,
+  type,
+  approver_id,
+  actor_id,
+}) {
+  const request = await createRequest({
+    title,
+    description,
+    type,
+    requester_id: actor_id,
+    approver_id,
+  });
+
   await createHistoryEntry({
     request_id: request.id,
     old_status: null,
     new_status: request.status,
     comment: "Solicitud creada",
-    actor_id: data.requester_id
+    actor_id,
   });
+
+  // Notificación interna + correo opcional
+  if (approver_id) {
+    await createNotification({
+      userId: approver_id,
+      requestId: request.id,
+      message: `Nueva solicitud #${request.id}: ${request.title}`,
+    });
+
+    // 🔔 Enviar correo al aprobador (si tiene email)
+    const approver = await getUserById(approver_id);
+    if (approver?.email) {
+      try {
+        await sendRequestCreatedEmail({
+          to: approver.email,
+          request,
+        });
+      } catch (err) {
+        console.error("Error enviando correo de nueva solicitud:", err);
+      }
+    }
+  }
 
   return request;
 }
@@ -34,39 +81,56 @@ export async function changeRequestStatus({
   requestId,
   newStatus,
   comment,
-  actor_id
+  actor_id,
 }) {
-  const existing = await getRequestById(requestId);
-  if (!existing) {
-    const error = new Error("Solicitud no encontrada");
-    error.statusCode = 404;
-    throw error;
+  const current = await getRequestById(requestId);
+  if (!current) {
+    const err = new Error("Solicitud no encontrada");
+    err.statusCode = 404;
+    throw err;
   }
 
-  if (existing.status === newStatus) {
-    const error = new Error("La solicitud ya tiene ese estado");
-    error.statusCode = 400;
-    throw error;
+  const oldStatus = current.status;
+
+  // ⛔ Evitar movimientos sin cambio real de estado
+  if (oldStatus === newStatus) {
+    const err = new Error(
+      `La solicitud ya está en estado "${newStatus}", no hay cambios que guardar.`
+    );
+    err.statusCode = 400;
+    throw err;
   }
 
-  if (existing.status !== "pendiente") {
-    const error = new Error("Solo se puede cambiar estado desde 'pendiente'");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const updated = await updateRequestStatus(requestId, newStatus);
+  const updateRes = await pool.query(
+    `UPDATE requests
+     SET status = $1,
+         updated_at = NOW()
+     WHERE id = $2
+     RETURNING *;`,
+    [newStatus, requestId]
+  );
+  const updated = updateRes.rows[0];
 
   await createHistoryEntry({
     request_id: requestId,
-    old_status: existing.status,
+    actor_id,
+    old_status: oldStatus,
     new_status: newStatus,
     comment,
-    actor_id
   });
+
+  await createNotification({
+    userId: current.requester_id,
+    requestId,
+    message: `Tu solicitud #${requestId} cambió a estado ${newStatus}.`,
+  });
+
+  // correo al solicitante...
 
   return updated;
 }
+
+
 
 export async function getRequestWithHistory(requestId) {
   const request = await getRequestById(requestId);
@@ -83,3 +147,5 @@ export async function getRequestWithHistory(requestId) {
 export async function listRequestsByApprover(approverId) {
   return await getRequestsByApprover(approverId);
 }
+
+

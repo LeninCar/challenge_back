@@ -2,8 +2,8 @@ import express from "express";
 import {
   createRequestController,
   getPendingController,
-  approveOrRejectController,
   getRequestDetailController,
+  changeRequestStatusController,
   getByApproverController
 } from "../controllers/requestsController.js";
 
@@ -16,7 +16,7 @@ router.post("/", createRequestController);
 router.get("/pending/:approverId", getPendingController);
 
 // Aprobar / Rechazar solicitud
-router.post("/:id/status", approveOrRejectController);
+router.post("/:id/status", changeRequestStatusController);
 
 // Ver detalle + historial
 router.get("/:id", getRequestDetailController);

@@ -3,27 +3,9 @@ import {
   listPendingRequests,
   changeRequestStatus,
   getRequestWithHistory,
-  listRequestsByApprover
+  listRequestsByApprover,
 } from "../services/requestsService.js";
 
-export async function createRequestController(req, res) {
-  try {
-    const { title, description, type, requester_id, approver_id } = req.body;
-
-    const request = await createNewRequest({
-      title,
-      description,
-      type,
-      requester_id,
-      approver_id
-    });
-
-    res.status(201).json(request);
-  } catch (err) {
-    console.error("Error createRequestController:", err);
-    res.status(500).json({ error: "Error creando solicitud" });
-  }
-}
 
 export async function getByApproverController(req, res) {
   try {
@@ -36,7 +18,6 @@ export async function getByApproverController(req, res) {
   }
 }
 
-
 export async function getPendingController(req, res) {
   try {
     const approverId = req.params.approverId;
@@ -48,36 +29,65 @@ export async function getPendingController(req, res) {
   }
 }
 
-export async function approveOrRejectController(req, res) {
+export async function getRequestDetailController(req, res) {
   try {
+    const id = req.params.id;
+    const data = await getRequestWithHistory(id);
+    if (!data) {
+      return res.status(404).json({ error: "Solicitud no encontrada" });
+    }
+    res.json(data); // 👈 { request, history }
+  } catch (err) {
+    console.error("Error getRequestDetailController:", err);
+    res.status(500).json({ error: "Error obteniendo solicitud" });
+  }
+}
+
+export async function createRequestController(req, res) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const { title, description, type, approver_id } = req.body;
+
+    const request = await createNewRequest({
+      title,
+      description,
+      type,
+      approver_id: Number(approver_id),
+      actor_id: req.user.id,
+    });
+
+    res.status(201).json(request);
+  } catch (err) {
+    console.error("Error createRequestController:", err);
+    res.status(500).json({ error: "Error creando solicitud" });
+  }
+}
+
+
+export async function changeRequestStatusController(req, res) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
     const requestId = req.params.id;
-    const { newStatus, comment, actor_id } = req.body;
+    const { newStatus, comment } = req.body;
 
     const updated = await changeRequestStatus({
       requestId,
       newStatus,
       comment,
-      actor_id
+      actor_id: req.user.id,    // 👈 SIEMPRE el usuario actual
     });
 
     res.json(updated);
   } catch (err) {
-    console.error("Error approveOrRejectController:", err);
+    console.error("Error changeRequestStatusController:", err);
     res.status(err.statusCode || 500).json({
-      error: err.message || "Error cambiando estado"
-    });
-  }
-}
-
-export async function getRequestDetailController(req, res) {
-  try {
-    const requestId = req.params.id;
-    const data = await getRequestWithHistory(requestId);
-    res.json(data);
-  } catch (err) {
-    console.error("Error getRequestDetailController:", err);
-    res.status(err.statusCode || 500).json({
-      error: err.message || "Error obteniendo detalle"
+      error: err.message || "Error cambiando estado",
     });
   }
 }

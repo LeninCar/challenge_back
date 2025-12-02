@@ -87,21 +87,23 @@ export async function changeRequestStatusController(req, res) {
       return res.status(401).json({ error: "No autenticado" });
     }
 
-    const requestId = req.params.id;
+    const { id } = req.params;
     const { newStatus, comment } = req.body;
 
-    const updated = await changeRequestStatus({
-      requestId,
+    const result = await changeRequestStatus({
+      requestId: Number(id),   
       newStatus,
       comment,
-      actor_id: req.user.id,    // 👈 SIEMPRE el usuario actual
+      actor_id: req.user.id, 
     });
 
-    res.json(updated);
+    // 👇 devolvemos lo que arme el service, con { changed, request, message }
+    return res.status(200).json(result);
   } catch (err) {
     console.error("Error changeRequestStatusController:", err);
-    res.status(err.statusCode || 500).json({
+    return res.status(err.statusCode || 500).json({
       error: err.message || "Error cambiando estado",
     });
   }
 }
+

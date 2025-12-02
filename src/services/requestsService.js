@@ -93,13 +93,13 @@ export async function changeRequestStatus({
   const oldStatus = current.status;
 
   // ⛔ Evitar movimientos sin cambio real de estado
-  if (oldStatus === newStatus) {
-    const err = new Error(
-      `La solicitud ya está en estado "${newStatus}", no hay cambios que guardar.`
-    );
-    err.statusCode = 400;
-    throw err;
-  }
+  if (current.status === newStatus) {
+  return {
+    changed: false,
+    request: current,
+    message: `La solicitud ya está en estado "${newStatus}", no hay cambios que guardar.`,
+  };
+}
 
   const updateRes = await pool.query(
     `UPDATE requests
@@ -125,9 +125,29 @@ export async function changeRequestStatus({
     message: `Tu solicitud #${requestId} cambió a estado ${newStatus}.`,
   });
 
-  // correo al solicitante...
+  //  Enviar correo al solicitante (si tiene email)
+  try {
+    const requester = await getUserById(current.requester_id);
+    if (requester?.email) {
+      await sendRequestStatusChangedEmail({
+        to: requester.email,
+        request: updated,   // usamos la solicitud ya actualizada
+        newStatus,
+      });
+    }
+  } catch (err) {
+    console.error(
+      "Error enviando correo de cambio de estado de solicitud:",
+      err
+    );
+    // no lanzamos error porque el cambio de estado ya se hizo en BD
+  }
 
-  return updated;
+  return {
+    changed: true,
+    request: updated,
+    message: `Estado actualizado de "${oldStatus}" a "${newStatus}".`,
+  };
 }
 
 

@@ -20,11 +20,24 @@ export async function createRequest({
 
 export async function getRequestById(id) {
   const res = await pool.query(
-    `SELECT * FROM requests WHERE id = $1`,
+    `SELECT
+        r.*,
+        ru.name  AS requester_name,
+        ru.email AS requester_email,
+        au.name  AS approver_name,
+        au.email AS approver_email
+     FROM requests r
+     JOIN users ru
+       ON ru.id = r.requester_id
+     LEFT JOIN users au
+       ON au.id = r.approver_id
+     WHERE r.id = $1`,
     [id]
   );
   return res.rows[0] || null;
 }
+
+
 
 // Traer una solicitud + historial
 export async function getRequestWithHistory(id) {
@@ -67,22 +80,34 @@ export async function getAllRequests() {
 // 🔹 NUEVO: listar TODAS las solicitudes de un aprobador (cualquier estado)
 export async function getRequestsByApprover(approverId) {
   const result = await pool.query(
-    `SELECT *
-     FROM requests
-     WHERE approver_id = $1
-     ORDER BY created_at DESC;`,
+    `SELECT
+        r.*,
+        ru.name  AS requester_name,
+        ru.email AS requester_email
+     FROM requests r
+     JOIN users ru
+       ON ru.id = r.requester_id
+     WHERE r.approver_id = $1
+     ORDER BY r.created_at DESC;`,
     [approverId]
   );
   return result.rows;
 }
 
+
 export async function getRequestsByRequesterId(requesterId) {
   const res = await pool.query(
-    `SELECT *
-     FROM requests
-     WHERE requester_id = $1
-     ORDER BY created_at DESC`,
+    `SELECT
+        r.*,
+        au.name  AS approver_name,
+        au.email AS approver_email
+     FROM requests r
+     LEFT JOIN users au
+       ON au.id = r.approver_id
+     WHERE r.requester_id = $1
+     ORDER BY r.created_at DESC`,
     [requesterId]
   );
   return res.rows;
 }
+

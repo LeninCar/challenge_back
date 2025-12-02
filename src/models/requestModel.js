@@ -75,3 +75,14 @@ export async function getRequestsByApprover(approverId) {
   );
   return result.rows;
 }
+
+export async function getRequestsByRequesterId(requesterId) {
+  const res = await pool.query(
+    `SELECT *
+     FROM requests
+     WHERE requester_id = $1
+     ORDER BY created_at DESC`,
+    [requesterId]
+  );
+  return res.rows;
+}

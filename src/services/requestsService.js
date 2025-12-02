@@ -131,7 +131,6 @@ export async function changeRequestStatus({
 }
 
 
-
 export async function getRequestWithHistory(requestId) {
   const request = await getRequestById(requestId);
   if (!request) {
@@ -146,6 +145,17 @@ export async function getRequestWithHistory(requestId) {
 
 export async function listRequestsByApprover(approverId) {
   return await getRequestsByApprover(approverId);
+}
+
+export async function getRequestsByRequesterId(requesterId) {
+  const res = await pool.query(
+    `SELECT *
+     FROM requests
+     WHERE requester_id = $1
+     ORDER BY created_at DESC`,
+    [requesterId]
+  );
+  return res.rows;
 }
 
 

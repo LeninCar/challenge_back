@@ -4,8 +4,22 @@ import {
   changeRequestStatus,
   getRequestWithHistory,
   listRequestsByApprover,
+  getRequestsByRequesterId,
 } from "../services/requestsService.js";
 
+export async function getMyRequests(req, res) {
+  if (!req.user) {
+    return res.status(401).json({ error: "No autenticado" });
+  }
+
+  try {
+    const myRequests = await getRequestsByRequesterId(req.user.id);
+    res.json(myRequests);
+  } catch (err) {
+    console.error("Error en getMyRequests:", err);
+    res.status(500).json({ error: "Error cargando tus solicitudes" });
+  }
+}
 
 export async function getByApproverController(req, res) {
   try {

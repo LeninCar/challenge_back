@@ -1,9 +1,13 @@
+// src/services/authService.js
 import { pool } from "../db.js";
 
 export async function findOrCreateUserFromGoogle({ googleId, email, name }) {
-  // Ajusta al esquema real de tu tabla users
+  // ¿Ya existe?
   const existing = await pool.query(
-    "SELECT * FROM users WHERE google_id = $1 OR email = $2 LIMIT 1",
+    `SELECT id, name, email, role, google_id
+     FROM users
+     WHERE google_id = $1 OR email = $2
+     LIMIT 1`,
     [googleId, email]
   );
 
@@ -11,14 +15,12 @@ export async function findOrCreateUserFromGoogle({ googleId, email, name }) {
     return existing.rows[0];
   }
 
-  // Rol por defecto, cámbialo si quieres
-  const role = "solicitante";
-
+  // Si no existe, lo creamos con role = NULL
   const insert = await pool.query(
     `INSERT INTO users (google_id, email, name, role)
-     VALUES ($1, $2, $3, $4)
-     RETURNING *`,
-    [googleId, email, name, role]
+     VALUES ($1, $2, $3, NULL)
+     RETURNING id, name, email, role, google_id`,
+    [googleId, email, name]
   );
 
   return insert.rows[0];
